@@ -1,0 +1,11 @@
+{
+    "name": "Salon Buff",
+    "short_name": "SalonBuff",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#FCECE8",
+    "theme_color": "#D4AF37",
+    "description": "Salon Buff - Premium Beauty Agent Chat Interface",
+    "orientation": "portrait-primary",
+    "icons": []
+}

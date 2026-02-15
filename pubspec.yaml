@@ -1,0 +1,24 @@
+name: salon_buff
+description: Salon Buff - Premium Beauty Agent Chat Interface
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  image_picker: ^1.0.7
+  mime: ^1.0.5
+  google_fonts: ^6.1.0
+  animate_do: ^3.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
