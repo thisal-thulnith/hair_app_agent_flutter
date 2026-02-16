@@ -18,7 +18,10 @@ class AuthService {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/login'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
         body: jsonEncode({
           'email': email,
           'password': password,
@@ -62,7 +65,10 @@ class AuthService {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/register-customer'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
         body: jsonEncode({
           'email': email,
           'password': password,

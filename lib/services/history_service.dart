@@ -30,6 +30,7 @@ class HistoryService {
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
       ).timeout(const Duration(seconds: 30));
 

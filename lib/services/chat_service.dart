@@ -35,6 +35,9 @@ class ChatService {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
+      // Required for ngrok free URLs to bypass browser warning
+      request.headers['ngrok-skip-browser-warning'] = 'true';
+
       // Add form fields
       request.fields['message'] = message;
       request.fields['session_id'] = sessionId;
