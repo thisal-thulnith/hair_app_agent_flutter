@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:animate_do/animate_do.dart';
 import '../models/chat_message.dart';
 import '../theme/app_theme.dart';
@@ -126,16 +127,23 @@ class MessageBubble extends StatelessWidget {
                 if (message.hasText) const SizedBox(height: 10),
               ],
               if (message.hasText)
-                Text(
-                  message.text!,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    fontSize: 14.5,
-                    height: 1.5,
-                    color: isAgent
-                        ? theme.colorScheme.onSurface
-                        : AppTheme.charcoal, // Dark text on gold gradient
-                    fontWeight: isAgent ? FontWeight.w400 : FontWeight.w500,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message.text!,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontSize: 14.5,
+                        height: 1.5,
+                        color: isAgent
+                            ? theme.colorScheme.onSurface
+                            : AppTheme.charcoal,
+                        fontWeight: isAgent ? FontWeight.w400 : FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildActionButtons(context, isAgent),
+                  ],
                 ),
             ],
           ),
@@ -206,5 +214,62 @@ class MessageBubble extends StatelessWidget {
       );
     }
     return const SizedBox.shrink();
+  }
+
+  Widget _buildActionButtons(BuildContext context, bool isAgent) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final buttonColor = isAgent
+        ? (isDark ? Colors.white.withOpacity(0.6) : Colors.black54)
+        : Colors.black.withOpacity(0.7);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Copy button
+        InkWell(
+          onTap: () async {
+            if (message.text != null) {
+              await Clipboard.setData(ClipboardData(text: message.text!));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Copied to clipboard'),
+                    duration: const Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    margin: const EdgeInsets.all(16),
+                    backgroundColor: AppTheme.gold.withOpacity(0.9),
+                  ),
+                );
+              }
+            }
+          },
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.copy_rounded,
+                  size: 14,
+                  color: buttonColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Copy',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: buttonColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

@@ -2,8 +2,11 @@ import 'dart:typed_data';
 import 'dart:ui';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import '../models/chat_message.dart';
 import '../services/chat_service.dart';
+import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/chat_input.dart';
@@ -28,6 +31,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final ChatService _chatService = ChatService();
   bool _isTyping = false;
+  bool _shouldCancelGeneration = false; // Flag to cancel generation
+  late String _currentSessionId; // Session ID for conversation tracking
 
   late AnimationController _bgAnimController;
   late AnimationController _headerAnimController;
@@ -36,6 +41,8 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _currentSessionId = const Uuid().v4(); // Generate new session ID
+
     _bgAnimController = AnimationController(
       duration: const Duration(seconds: 8),
       vsync: this,
@@ -59,6 +66,18 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _startNewConversation() {
+    setState(() {
+      _currentSessionId = const Uuid().v4();
+      _messages.clear();
+      _messages.add(ChatMessage(
+        text: "Welcome to Salon Buff! ✨ I'm your premium beauty assistant. Ask me about hairstyles, skincare, makeup tips, or upload a photo for personalized advice!",
+        isAgent: true,
+      ));
+    });
+    _scrollToBottom();
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -79,6 +98,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     });
   }
 
+  void _stopGenerating() {
+    setState(() {
+      _shouldCancelGeneration = true;
+      _isTyping = false;
+    });
+  }
+
   Future<void> _handleSend(String text, Uint8List? imageBytes, String? imageName) async {
     setState(() {
       _messages.add(ChatMessage(
@@ -88,15 +114,31 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         isAgent: false,
       ));
       _isTyping = true;
+      _shouldCancelGeneration = false; // Reset cancel flag
     });
     _scrollToBottom();
 
     try {
       final response = await _chatService.sendMessage(
         message: text,
+        sessionId: _currentSessionId,
         imageBytes: imageBytes,
         imageName: imageName,
       );
+
+      // Check if generation was cancelled
+      if (_shouldCancelGeneration) {
+        setState(() {
+          _messages.add(ChatMessage(
+            text: "(Generation stopped)",
+            isAgent: true,
+          ));
+          _isTyping = false;
+          _shouldCancelGeneration = false;
+        });
+        return;
+      }
+
       setState(() {
         _messages.add(ChatMessage(
           text: response['response'] as String?,
@@ -106,6 +148,19 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         _isTyping = false;
       });
     } catch (e) {
+      // Check if it was cancelled
+      if (_shouldCancelGeneration) {
+        setState(() {
+          _messages.add(ChatMessage(
+            text: "(Generation stopped)",
+            isAgent: true,
+          ));
+          _isTyping = false;
+          _shouldCancelGeneration = false;
+        });
+        return;
+      }
+
       setState(() {
         _messages.add(ChatMessage(
           text: "I'm having trouble connecting right now. Please try again later.",
@@ -119,6 +174,9 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    // Authentication check disabled for now
+    // Can be re-enabled later when auth is needed
+
     final theme = Theme.of(context);
     final isDark = widget.isDark;
 
@@ -138,16 +196,28 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
               Expanded(
                 child: _messages.isEmpty
                     ? _buildEmptyState(context, isDark)
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        itemCount: _messages.length + (_isTyping ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == _messages.length && _isTyping) {
-                            return const TypingIndicator();
-                          }
-                          return MessageBubble(message: _messages[index]);
-                        },
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              itemCount: _messages.length + (_isTyping ? 1 : 0),
+                              itemBuilder: (context, index) {
+                                if (index == _messages.length && _isTyping) {
+                                  return const TypingIndicator();
+                                }
+                                return MessageBubble(message: _messages[index]);
+                              },
+                            ),
+                          ),
+                          // Stop generating button
+                          if (_isTyping)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _buildStopButton(isDark),
+                            ),
+                        ],
                       ),
               ),
               ChatInput(onSend: _handleSend, isLoading: _isTyping),
@@ -239,6 +309,27 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildStopButton(bool isDark) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: ElevatedButton.icon(
+        onPressed: _stopGenerating,
+        icon: Icon(Icons.stop_circle_outlined, size: 18),
+        label: Text('Stop Generating'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          foregroundColor: AppTheme.gold,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: AppTheme.gold.withOpacity(0.5), width: 1.5),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ─── Frosted glass header with theme toggle ───
   Widget _buildGlassHeader(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
@@ -268,6 +359,14 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             ),
             child: Row(
               children: [
+                // ─── Profile Button (disabled for now - no auth) ───
+                // IconButton(
+                //   icon: Icon(Icons.person_rounded, color: AppTheme.gold),
+                //   onPressed: () {
+                //     Navigator.of(context).pushNamed('/profile');
+                //   },
+                //   tooltip: 'Profile',
+                // ),
                 // ─── Title & Subtitle ───
                 Expanded(
                   child: Column(
@@ -293,8 +392,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-                // ─── Theme Toggle Button (Spacing Fix) ───
-                const SizedBox(width: 44), // To balance the toggle button on the right
+                // ─── New Conversation Button ───
+                IconButton(
+                  icon: Icon(Icons.add_circle_outline, color: AppTheme.gold),
+                  onPressed: _startNewConversation,
+                  tooltip: 'New Conversation',
+                ),
               ],
             ),
           ),

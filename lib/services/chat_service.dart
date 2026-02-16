@@ -1,69 +1,88 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:http/http.dart' as http;
+import 'auth_service.dart';
 
 class ChatService {
-  // Change this to your backend URL
-  // For Android emulator use 10.0.2.2 instead of localhost
-  // For web, use localhost
+  // Backend URL for Beauty AI API via ngrok
+  // This works on all platforms (Web, Android, iOS)
   static const String _baseUrl = 'https://4ee5-222-165-182-230.ngrok-free.app';
 
+  final AuthService _authService = AuthService();
+
   /// Sends a chat message (text + optional image) to the backend.
-  /// Returns a Map with 'response' (String) and optionally 'image' (String URL).
+  /// Requires authentication token and session ID for conversation context.
+  /// Returns a Map with 'response', 'generated_image', and 'session_id'.
   Future<Map<String, dynamic>> sendMessage({
     required String message,
+    required String sessionId,
     Uint8List? imageBytes,
     String? imageName,
   }) async {
     try {
-      final Map<String, dynamic> body = {
-        'message': message,
-      };
+      // Get authentication token (optional for now)
+      final token = await _authService.getToken();
 
-      // If image is provided, encode as base64
+      // Create multipart request
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$_baseUrl/chat/upload'),
+      );
+
+      // Add authorization header if token exists
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      // Add form fields
+      request.fields['message'] = message;
+      request.fields['session_id'] = sessionId;
+
+      // Add image file if present
       if (imageBytes != null) {
-        final base64Image = base64Encode(imageBytes);
-        final dataUri = 'data:image/jpeg;base64,$base64Image';
-        
-        // Try multiple formats to ensure backend recognition
-        body['image'] = base64Image;
-        body['image_data'] = base64Image;
-        body['images'] = [base64Image]; // List format
-        body['image_url'] = dataUri; // Data URI format
-        
-        body['file'] = base64Image;
-        body['filename'] = imageName ?? 'upload.jpg';
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            imageBytes,
+            filename: imageName ?? 'upload.jpg',
+          ),
+        );
+        print('Sending image: ${imageName ?? 'upload.jpg'} (${imageBytes.length} bytes)');
       }
 
-      print('Sending message to backend (JSON)...');
-      print('Request keys: ${body.keys.toList()}');
-      if (body.containsKey('image')) {
-        print('Image payload size: ${(body['image'] as String).length} chars');
-      }
+      print('Sending message to backend...');
+      print('Session ID: $sessionId');
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/chat'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 30));
+      // Send request
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 60),
+      );
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
-        print('Backend Response: $data'); // Debug log
-        
-        // Normalize response for UI
-        if (data.containsKey('generated_image') && data['generated_image'] != null) {
-          data['image'] = data['generated_image'];
-        }
-        
-        return data;
+        print('Backend Response received');
+
+        // Return normalized response
+        return {
+          'response': data['response'] ?? '',
+          'image': data['generated_image'], // Hair styling results
+          'session_id': data['session_id'] ?? sessionId,
+        };
+      } else if (response.statusCode == 401) {
+        print('Authentication expired (401)');
+        throw Exception('Authentication expired');
       } else {
         print('Server error: ${response.statusCode} - ${response.body}');
         throw Exception('Server error: ${response.statusCode}');
       }
     } catch (e) {
+      if (e.toString().contains('Authentication expired')) {
+        rethrow;
+      }
       print('Failed to send message: $e');
-      throw Exception('Failed to send message: $e');
+      throw Exception('Network error. Please check your connection.');
     }
   }
 }
