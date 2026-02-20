@@ -35,9 +35,18 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // IMPORTANT: Disable minification to prevent crashes
+            // Firebase and Google Sign-In don't work well with code shrinking
+            isMinifyEnabled = false
+            isShrinkResources = false
+
+            // If you want to enable minification later, uncomment below:
+            // isMinifyEnabled = true
+            // isShrinkResources = true
+            // proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
