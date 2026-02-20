@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "572591532042",
+    "project_id": "salonbuff-435b2",
+    "storage_bucket": "salonbuff-435b2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:572591532042:android:0a9e765aa2e39a0633d7f3",
+        "android_client_info": {
+          "package_name": "com.beautyai.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "572591532042-gkkcde62l9le24627ivc32h9foauh3mj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAaWUqmH4xdrbGWFZVMSuy55RRHL_jT-zA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "572591532042-gkkcde62l9le24627ivc32h9foauh3mj.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

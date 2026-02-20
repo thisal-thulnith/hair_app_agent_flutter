@@ -1,12 +1,20 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:http/http.dart' as http;
 import '../models/consultation.dart';
 import 'auth_service.dart';
 
 class HistoryService {
-  // Backend URL for Beauty AI API via ngrok
-  // This works on all platforms (Web, Android, iOS)
-  static const String _baseUrl = 'https://4ee5-222-165-182-230.ngrok-free.app';
+  // Backend URL for Beauty AI API on localhost:8000
+  static String get _baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:8000';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000';
+    }
+    return 'http://localhost:8000';
+  }
 
   final AuthService _authService = AuthService();
 
@@ -30,7 +38,6 @@ class HistoryService {
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
-          'ngrok-skip-browser-warning': 'true',
         },
       ).timeout(const Duration(seconds: 30));
 

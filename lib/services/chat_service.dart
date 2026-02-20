@@ -1,13 +1,21 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
 
 class ChatService {
-  // Backend URL for Beauty AI API via ngrok
-  // This works on all platforms (Web, Android, iOS)
-  static const String _baseUrl = 'https://4ee5-222-165-182-230.ngrok-free.app';
+  // Backend URL for Beauty AI API on localhost:8000
+  static String get _baseUrl {
+    if (kIsWeb) {
+      return 'http://localhost:8000';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:8000';
+    }
+    return 'http://localhost:8000';
+  }
 
   final AuthService _authService = AuthService();
 
@@ -24,26 +32,47 @@ class ChatService {
       // Get authentication token (optional for now)
       final token = await _authService.getToken();
 
-      // Create multipart request
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$_baseUrl/chat/upload'),
-      );
+      print('Sending message to backend...');
+      print('Session ID: $sessionId');
 
-      // Add authorization header if token exists
-      if (token != null) {
-        request.headers['Authorization'] = 'Bearer $token';
-      }
+      http.Response response;
 
-      // Required for ngrok free URLs to bypass browser warning
-      request.headers['ngrok-skip-browser-warning'] = 'true';
+      // Use JSON endpoint for text-only, multipart for images
+      if (imageBytes == null) {
+        // Text-only message - use /chat endpoint with JSON
+        response = await http
+            .post(
+              Uri.parse('$_baseUrl/chat'),
+              headers: {
+                'Content-Type': 'application/json',
+                if (token != null) 'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode({
+                'message': message,
+                'session_id': sessionId,
+              }),
+            )
+            .timeout(const Duration(seconds: 60));
+      } else {
+        // Image upload - use /chat/upload endpoint with multipart
+        print(
+            'Sending image: ${imageName ?? 'upload.jpg'} (${imageBytes.length} bytes)');
 
-      // Add form fields
-      request.fields['message'] = message;
-      request.fields['session_id'] = sessionId;
+        var request = http.MultipartRequest(
+          'POST',
+          Uri.parse('$_baseUrl/chat/upload'),
+        );
 
-      // Add image file if present
-      if (imageBytes != null) {
+        // Add authorization header if token exists
+        if (token != null) {
+          request.headers['Authorization'] = 'Bearer $token';
+        }
+
+        // Add form fields
+        request.fields['message'] = message;
+        request.fields['session_id'] = sessionId;
+
+        // Add image file
         request.files.add(
           http.MultipartFile.fromBytes(
             'image',
@@ -51,17 +80,13 @@ class ChatService {
             filename: imageName ?? 'upload.jpg',
           ),
         );
-        print('Sending image: ${imageName ?? 'upload.jpg'} (${imageBytes.length} bytes)');
+
+        // Send request
+        final streamedResponse = await request.send().timeout(
+              const Duration(seconds: 60),
+            );
+        response = await http.Response.fromStream(streamedResponse);
       }
-
-      print('Sending message to backend...');
-      print('Session ID: $sessionId');
-
-      // Send request
-      final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 60),
-      );
-      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -78,14 +103,22 @@ class ChatService {
         throw Exception('Authentication expired');
       } else {
         print('Server error: ${response.statusCode} - ${response.body}');
-        throw Exception('Server error: ${response.statusCode}');
+        // Try to parse error detail from response
+        try {
+          final errorData = jsonDecode(response.body);
+          final detail =
+              errorData['detail'] ?? 'Server error: ${response.statusCode}';
+          throw Exception(detail);
+        } catch (_) {
+          throw Exception('Server error: ${response.statusCode}');
+        }
       }
     } catch (e) {
       if (e.toString().contains('Authentication expired')) {
         rethrow;
       }
       print('Failed to send message: $e');
-      throw Exception('Network error. Please check your connection.');
+      throw Exception('Failed to send message: $e');
     }
   }
 }

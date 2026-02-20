@@ -1,79 +1,114 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-import 'screens/chat_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/splash_screen.dart';
-import 'screens/profile_screen.dart';
-import 'screens/history_screen.dart';
-import 'providers/auth_provider.dart';
-import 'theme/app_theme.dart';
+import 'firebase_options.dart';
+import 'providers/app_auth_provider.dart';
+import 'providers/app_chat_provider.dart';
+import 'screens/final_buff_login.dart';
+import 'screens/final_buff_chat.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-      ],
-      child: const SalonBuffApp(),
+
+  // Set system UI to transparent
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
     ),
   );
-}
 
-class SalonBuffApp extends StatefulWidget {
-  const SalonBuffApp({super.key});
-
-  // Global key to access theme toggle from anywhere
-  static final GlobalKey<_SalonBuffAppState> appKey = GlobalKey<_SalonBuffAppState>();
-
-  @override
-  State<SalonBuffApp> createState() => _SalonBuffAppState();
-}
-
-class _SalonBuffAppState extends State<SalonBuffApp> {
-  ThemeMode _themeMode = ThemeMode.dark; // Start in dark mode
-
-  @override
-  void initState() {
-    super.initState();
-    // Initialize auth provider to check for saved token
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AuthProvider>(context, listen: false).initialize();
-    });
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    print('❌ Firebase initialization error: $e');
   }
 
-  void toggleTheme() {
-    setState(() {
-      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
-    });
-  }
+  runApp(const BuffApp());
+}
 
-  bool get isDark => _themeMode == ThemeMode.dark;
+class BuffApp extends StatelessWidget {
+  const BuffApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      key: SalonBuffApp.appKey,
-      title: 'Salon Buff',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: _themeMode,
-      routes: {
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/chat': (context) => ChatScreen(
-              onToggleTheme: toggleTheme,
-              isDark: isDark,
-            ),
-        '/profile': (context) => const ProfileScreen(),
-        '/history': (context) => const HistoryScreen(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppAuthProvider()),
+        ChangeNotifierProvider(create: (_) => AppChatProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Buff Salon - AI Beauty Assistant',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFFFFD700),
+            secondary: Color(0xFFFFA500),
+            surface: Color(0xFF1A1A1A),
+            background: Color(0xFF0F0F0F),
+          ),
+          scaffoldBackgroundColor: const Color(0xFF0F0F0F),
+        ),
+        home: const AppRoot(),
+      ),
+    );
+  }
+}
+
+class AppRoot extends StatelessWidget {
+  const AppRoot({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AppAuthProvider>(
+      builder: (context, authProvider, child) {
+        if (authProvider.isLoading) {
+          return const LoadingScreen();
+        }
+
+        if (!authProvider.isAuthenticated) {
+          return const FinalBuffLogin();
+        }
+
+        return const FinalBuffChat();
       },
-      // Skip authentication for now - go directly to chat
-      home: ChatScreen(
-        onToggleTheme: toggleTheme,
-        isDark: isDark,
+    );
+  }
+}
+
+class LoadingScreen extends StatelessWidget {
+  const LoadingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Loading Buff...',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
       ),
     );
   }
